@@ -1,5 +1,5 @@
 {
-    "name": "jascha030/template",
+    "name": "jascha030/composer-scaffolder",
     "description": "Template repo for creating composer packages",
     "license": "MIT",
     "type": "library",
@@ -26,12 +26,12 @@
     "prefer-stable": true,
     "autoload": {
         "psr-4": {
-            "Jascha030\\Project\\": "src/"
+            "Jascha030\\ComposerScaffolder\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "Jascha030\\Project\\": "tests/"
+            "Jascha030\\ComposerScaffolder\\": "tests/"
         }
     },
     "config": {

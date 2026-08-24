@@ -1,7 +1,7 @@
 <?php
 
 /*
- * This file is part of the jascha030/template package.
+ * This file is part of the jascha030/composer-scaffolder package.
  *
  * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
  *
@@ -46,7 +46,7 @@ $finder = Finder::create()
 return new Config(
     80400,
     <<<'EOF'
-        This file is part of the jascha030/template package.
+        This file is part of the jascha030/composer-scaffolder package.
 
         (c) Jascha van Aalst <contact@jaschavanaalst.nl>
 
