@@ -18,7 +18,7 @@ A simple project description similar to the one found in your `composer.json`.
 Installation instructions, with _examples like the one below_.
 
 ```shell
-composer require jascha030/composer-template
+composer require jascha030/composer-scaffolder
 ```
 
 #### Distribution
@@ -26,7 +26,7 @@ composer require jascha030/composer-template
 Alternative steps for distribution when not required as composer package.
 
 ```shell
-composer require --no-dev jascha030/composer-template
+composer require --no-dev jascha030/composer-scaffolder
 ```
 
 ## Usage
@@ -77,7 +77,7 @@ understanding a certain subject.
 ## License
 
 This composer package is an open-sourced software licensed under
-the [MIT License](https://github.com/jascha030/composer-template/blob/master/LICENSE.md)
+the [MIT License](https://github.com/jascha030/composer-scaffolder/blob/master/LICENSE.md)
 
 > **Note:** to find the right license for your project
 > use Github's [https://choosealicense.com/](https://choosealicense.com/),
