@@ -1,0 +1,105 @@
+{
+    "name": "jascha030/template",
+    "description": "Template repo for creating composer packages",
+    "license": "MIT",
+    "type": "library",
+    "authors": [
+        {
+            "name": "Jascha030",
+            "email": "contact@jaschavanaalst.nl"
+        }
+    ],
+    "homepage": "https://github.com/jascha030",
+    "require": {
+        "php": ">=8.4",
+        "composer-runtime-api": "^2.2"
+    },
+    "require-dev": {
+        "bamarni/composer-bin-plugin": "^1.9",
+        "ergebnis/composer-normalize": "^2.52",
+        "phpstan/phpstan": "^2.2",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "roave/backward-compatibility-check": "^8.21",
+        "roave/security-advisories": "dev-latest"
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "Jascha030\\Project\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Jascha030\\Project\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "bamarni/composer-bin-plugin": true,
+            "ergebnis/composer-normalize": true
+        },
+        "platform": {
+            "php": "8.4.1"
+        },
+        "platform-check": false,
+        "sort-packages": true
+    },
+    "extra": {
+        "bamarni-bin": {
+            "bin-links": true,
+            "forward-command": true
+        },
+        "composer-normalize": {
+            "indent-size": 4,
+            "indent-style": "space"
+        }
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "@tools:install"
+        ],
+        "analyze": [
+            "@tools:install",
+            "@phpstan analyze --memory-limit=-1 -c phpstan.neon.dist"
+        ],
+        "analyze:baseline": [
+            "@tools:install",
+            "@phpstan analyze --memory-limit=-1 -c phpstan.neon.dist --generate-baseline"
+        ],
+        "bc-check": "vendor/bin/roave-backward-compatibility-check --format=markdown > results.md",
+        "format": [
+            "@format:php"
+        ],
+        "format:php": "@php-cs-fixer fix --config=.php-cs-fixer.dist.php",
+        "phive": "@php tools/project-tools.php phive",
+        "php-cs-fixer": "vendor/bin/php-cs-fixer",
+        "phpactor:schema": "@php tools/project-tools.php phpactor:schema",
+        "phpstan": "vendor/bin/phpstan",
+        "phpunit": "tools/phpunit.phar",
+        "test": [
+            "@tools:install",
+            "@putenv XDEBUG_MODE=coverage",
+            "@phpunit -c phpunit.xml.dist"
+        ],
+        "tools:install": [
+            "@putenv XDEBUG_MODE=off",
+            "@putenv COMPOSER_ALLOW_SUPERUSER=1",
+            "@php tools/project-tools.php phive install --trust-gpg-keys 4AA394086372C20A 1> /dev/null",
+            "@php -r \" ! file_exists('tools/phpunit.xsd') && (new Phar('tools/phpunit.phar'))->extractTo('tools', 'phpunit.xsd');\""
+        ]
+    },
+    "scripts-descriptions": {
+        "analyze": "Runs local phpstan analyze with config:  `phpstan.neon.dist`.",
+        "analyze:baseline": "Runs local phpstan analyze with config: `phpstan.neon.dist`, and generates a new `phpstan-baseline.neon`.",
+        "bc-check": "Check for backwards-compatibility issues.",
+        "format": "Run @format:php script.",
+        "format:php": "@php-cs-fixer fix --config=.php-cs-fixer.dist.php",
+        "phive": "Proxy the phive binary, auto-downloaded by ./tools/project-tools.php on first use.",
+        "php-cs-fixer": "Proxy the php-cs-fixer binary, installed with composer-bin-plugin under the php-cs-fixer namespace in ./vendor-bin/php-cs-fixer.",
+        "phpstan": "Proxy the phpstan binary, installed in ./vendor/bin/phpstan.",
+        "phpunit": "Proxy the phpunit binary, installed with phive in the ./tools directory.",
+        "test": "Run the unit testsuite, runs @tools:install followed by @phpunit -c phpunit.xml.dist",
+        "tools:install": "Install the dependencies specified in ./.phive/phars.xml using @phive"
+    }
+}

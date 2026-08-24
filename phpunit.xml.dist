@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:noNamespaceSchemaLocation="./tools/phpunit.xsd"
+  bootstrap="./tests/bootstrap.php"
+  executionOrder="depends,defects"
+  beStrictAboutOutputDuringTests="true"
+  failOnRisky="true"
+  failOnWarning="true"
+  colors="true"
+  testdox="true"
+  cacheResult="true"
+  cacheDirectory=".var/cache/phpunit"
+  requireCoverageMetadata="true"
+>
+  <testsuites>
+    <testsuite name="default">
+      <directory>tests</directory>
+    </testsuite>
+  </testsuites>
+  <coverage>
+    <report>
+      <clover outputFile=".var/cache/phpunit/cov.xml"/>
+      <text outputFile="php://stdout"/>
+    </report>
+  </coverage>
+  <source>
+    <include>
+      <directory suffix=".php">src</directory>
+    </include>
+  </source>
+</phpunit>
