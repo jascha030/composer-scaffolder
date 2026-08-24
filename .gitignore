@@ -1,0 +1,26 @@
+### Default project gitignore
+
+## IDE Projectfiles
+/.idea/
+
+## Dynamic
+/.var/
+**.cache
+
+## Library
+vendor/
+/node_modules/
+/tools/*
+!/tools/project-tools.php
+
+## Env
+/.env
+/auth.json
+/.pm.toml
+
+## Other
+/*.DS_Store
+/.DS_Store
+/*.sql
+/TODO.md
+/results.md
