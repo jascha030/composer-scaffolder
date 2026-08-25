@@ -1,22 +1,14 @@
 <?php
 
-/*
- * This file is part of the jascha030/composer-scaffolder package.
- *
- * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core;
 
 use Jascha030\Scaffolder\Core\Answer\AnswerBag;
+use Jascha030\Scaffolder\Core\Answer\AnswerResolver;
 use Jascha030\Scaffolder\Core\Contract\AnswerProvider;
+use Jascha030\Scaffolder\Core\Contract\GeneratedProjectValidator;
 use Jascha030\Scaffolder\Core\Exception\FilesystemException;
-use Jascha030\Scaffolder\Core\Exception\InvalidManifestException;
 use Jascha030\Scaffolder\Core\Manifest\Manifest;
 use Jascha030\Scaffolder\Core\Operation\FileOperation;
 use Jascha030\Scaffolder\Core\Operation\OperationMode;
@@ -30,16 +22,16 @@ use SplFileInfo;
 use Throwable;
 
 use function dirname;
-use function is_object;
+use function random_bytes;
 use function strlen;
-
-use const JSON_ERROR_NONE;
 
 final class Scaffolder
 {
     public function __construct(
         private readonly AnswerProvider $answerProvider,
         private readonly ScaffoldPlanner $planner,
+        private readonly GeneratedProjectValidator $projectValidator,
+        private readonly AnswerResolver $answerResolver = new AnswerResolver(),
     ) {
     }
 
@@ -51,22 +43,27 @@ final class Scaffolder
         bool $dryRun = false,
         bool $force = false,
     ): ScaffoldPlan {
-        $answers = $this->answerProvider->collect($manifest, $predefined);
         $plan    = $this->planner->plan($manifest, $template->payloadPath, $destination);
+        $answers = $this->answerResolver->resolve($manifest, $predefined, $this->answerProvider);
+
+        $this->assertDestinationAvailable($plan->destination, $force);
 
         if ($dryRun) {
             return $plan;
         }
 
-        $this->prepareDestinationDirectory($plan->destination, $force);
         $staging = $this->createStagingDirectory($plan->destination);
 
         try {
             $this->executePlan($plan, $staging, $answers);
-            $this->validateGeneratedProject($staging);
-            $this->finalizeDestination($staging, $plan->destination);
+            $this->projectValidator->validate($staging);
+            $this->finalizeDestination($staging, $plan->destination, $force);
         } catch (Throwable $exception) {
-            $this->removeDirectory($staging);
+            try {
+                $this->removeDirectory($staging);
+            } catch (Throwable $cleanupException) {
+                throw FilesystemException::cleanupFailed($staging, $cleanupException, $exception);
+            }
 
             throw $exception;
         }
@@ -74,25 +71,19 @@ final class Scaffolder
         return $plan;
     }
 
-    private function prepareDestinationDirectory(string $destination, bool $force): void
+    private function assertDestinationAvailable(string $destination, bool $force): void
     {
-        if (! file_exists($destination)) {
+        if (! file_exists($destination) && ! is_link($destination)) {
             return;
         }
 
-        if (! is_dir($destination)) {
-            throw FilesystemException::destinationExists($destination);
-        }
-
-        if (! $this->isDirectoryEmpty($destination)) {
+        if (is_link($destination) || ! is_dir($destination) || ! $this->isDirectoryEmpty($destination)) {
             throw FilesystemException::destinationExists($destination);
         }
 
         if (! $force) {
             throw FilesystemException::emptyDestinationRequiresForce($destination);
         }
-
-        $this->removeDirectory($destination);
     }
 
     private function isDirectoryEmpty(string $path): bool
@@ -114,15 +105,9 @@ final class Scaffolder
             throw FilesystemException::cannotCreateDirectory($parent);
         }
 
-        $staging = $parent . '/.' . basename($destination) . '.scaffold.' . uniqid('', true);
+        $staging = $parent . '/.' . basename($destination) . '.scaffold.' . bin2hex(random_bytes(12));
 
-        if (! @mkdir($staging, 0o755, true) && ! is_dir($staging)) {
-            throw FilesystemException::cannotCreateDirectory($staging);
-        }
-
-        $realStaging = realpath($staging);
-
-        if (false === $realStaging) {
+        if (! @mkdir($staging, 0o700) || false === ($realStaging = realpath($staging))) {
             throw FilesystemException::cannotCreateDirectory($staging);
         }
 
@@ -172,18 +157,13 @@ final class Scaffolder
             throw FilesystemException::cannotReadFile($operation->source);
         }
 
-        $rendered = $this->isJsonTarget($target) ? $renderer->renderJson($contents) : $renderer->render($contents);
+        $rendered = str_ends_with($target, '.json') ? $renderer->renderJson($contents) : $renderer->render($contents);
 
         if (false === @file_put_contents($target, $rendered)) {
             throw FilesystemException::cannotWriteFile($target);
         }
 
         $this->copyPermissions($operation->source, $target);
-    }
-
-    private function isJsonTarget(string $target): bool
-    {
-        return str_ends_with($target, '.json');
     }
 
     private function copyFile(FileOperation $operation, string $target): void
@@ -199,38 +179,18 @@ final class Scaffolder
     {
         $permissions = @fileperms($source);
 
-        if (false !== $permissions) {
-            @chmod($target, $permissions);
+        if (false !== $permissions && ! @chmod($target, $permissions & 0o7777)) {
+            throw FilesystemException::cannotWriteFile($target);
         }
     }
 
-    private function validateGeneratedProject(string $staging): void
+    private function finalizeDestination(string $staging, string $destination, bool $force): void
     {
-        $composerJson = $staging . '/composer.json';
-
-        if (! is_file($composerJson)) {
-            throw InvalidManifestException::notAnObject($composerJson);
+        if (file_exists($destination) || is_link($destination)) {
+            $this->assertDestinationAvailable($destination, $force);
+            $this->removeDirectory($destination);
         }
 
-        $contents = @file_get_contents($composerJson);
-
-        if (false === $contents) {
-            throw InvalidManifestException::invalidJson($composerJson, 'Unable to read file.');
-        }
-
-        $data = json_decode(trim($contents));
-
-        if (JSON_ERROR_NONE !== json_last_error()) {
-            throw InvalidManifestException::invalidJson($composerJson, json_last_error_msg());
-        }
-
-        if (! is_object($data)) {
-            throw InvalidManifestException::notAnObject($composerJson);
-        }
-    }
-
-    private function finalizeDestination(string $staging, string $destination): void
-    {
         if (! @rename($staging, $destination)) {
             throw FilesystemException::cannotMove($staging, $destination);
         }
@@ -238,8 +198,10 @@ final class Scaffolder
 
     private function removeDirectory(string $path): void
     {
-        if (! is_dir($path)) {
-            @unlink($path);
+        if (is_link($path) || ! is_dir($path)) {
+            if (file_exists($path) && ! @unlink($path)) {
+                throw FilesystemException::cannotRemove($path);
+            }
 
             return;
         }
@@ -254,13 +216,17 @@ final class Scaffolder
                 continue;
             }
 
-            if ($item->isDir()) {
-                @rmdir($item->getPathname());
-            } else {
-                @unlink($item->getPathname());
+            $removed = $item->isLink() || $item->isFile()
+                ? @unlink($item->getPathname())
+                : @rmdir($item->getPathname());
+
+            if (! $removed) {
+                throw FilesystemException::cannotRemove($item->getPathname());
             }
         }
 
-        @rmdir($path);
+        if (! @rmdir($path)) {
+            throw FilesystemException::cannotRemove($path);
+        }
     }
 }

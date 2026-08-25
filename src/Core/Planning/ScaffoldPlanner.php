@@ -1,14 +1,5 @@
 <?php
 
-/*
- * This file is part of the jascha030/composer-scaffolder package.
- *
- * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core\Planning;
@@ -17,41 +8,39 @@ use Jascha030\Scaffolder\Core\Exception\PlanningException;
 use Jascha030\Scaffolder\Core\Manifest\Manifest;
 use Jascha030\Scaffolder\Core\Operation\FileOperation;
 
+use function dirname;
 use function in_array;
+use function str_contains;
 
 final class ScaffoldPlanner
 {
-    public function plan(
-        Manifest $manifest,
-        string $payloadPath,
-        string $destination,
-    ): ScaffoldPlan {
-        $payloadRealPath     = realpath($payloadPath);
-        $destinationRealPath = realpath($destination) ?: rtrim($destination, '/\\');
+    public function plan(Manifest $manifest, string $payloadPath, string $destination): ScaffoldPlan
+    {
+        $payloadRealPath = realpath($payloadPath);
 
-        if (false === $payloadRealPath) {
+        if (false === $payloadRealPath || ! is_dir($payloadRealPath)) {
             throw PlanningException::missingSource($payloadPath);
         }
 
-        $targets    = [];
-        $operations = [];
+        $destinationPath = $this->normalizeDestination($destination);
+        $targets         = [];
+        $operations      = [];
 
         foreach ($manifest->files as $file) {
             $this->assertRelativePath($file->source, PlanningException::absoluteSource(...), PlanningException::traversalSource(...));
             $this->assertRelativePath($file->target, PlanningException::absoluteTarget(...), PlanningException::traversalTarget(...));
 
             $sourcePath = Path::join($payloadRealPath, $file->source);
-            $targetPath = Path::join($destinationRealPath, $file->target);
+            $targetPath = Path::join($destinationPath, $file->target);
 
-            $this->assertSourceExists($sourcePath);
             $this->assertSourceInsidePayload($sourcePath, $payloadRealPath);
-            $this->assertTargetUnique($file->target, $targets);
+            $this->assertTargetAvailable($file->target, $targets);
 
             $operations[] = new FileOperation($sourcePath, $targetPath, $file->mode);
             $targets[]    = $file->target;
         }
 
-        return new ScaffoldPlan($destinationRealPath, $operations);
+        return new ScaffoldPlan($destinationPath, $operations);
     }
 
     /**
@@ -69,37 +58,53 @@ final class ScaffoldPlanner
         }
     }
 
-    private function assertSourceExists(string $sourcePath): void
+    private function normalizeDestination(string $destination): string
     {
-        if (! is_file($sourcePath)) {
-            throw PlanningException::missingSource($sourcePath);
+        $destination = rtrim($destination, '/\\');
+
+        if ('' === $destination) {
+            throw PlanningException::invalidDestination($destination);
         }
+
+        $existing = realpath($destination);
+        if (false !== $existing) {
+            return $existing;
+        }
+
+        $parent = realpath(dirname($destination));
+        if (false === $parent) {
+            $parent = dirname($destination);
+        }
+
+        return Path::join($parent, basename($destination));
     }
 
     private function assertSourceInsidePayload(string $sourcePath, string $payloadRealPath): void
     {
         $realSource = realpath($sourcePath);
 
-        if (false === $realSource) {
+        if (false === $realSource || ! is_file($realSource)) {
             throw PlanningException::missingSource($sourcePath);
         }
 
         if (! str_starts_with($realSource, rtrim($payloadRealPath, '/\\') . '/')) {
             throw PlanningException::sourceOutsidePayload($sourcePath);
         }
-
-        if (is_link($sourcePath)) {
-            throw PlanningException::symlinkEscape($sourcePath);
-        }
     }
 
     /**
      * @param list<string> $targets
      */
-    private function assertTargetUnique(string $target, array $targets): void
+    private function assertTargetAvailable(string $target, array $targets): void
     {
-        if (in_array($target, $targets, true)) {
-            throw PlanningException::duplicateTarget($target);
+        foreach ($targets as $existing) {
+            if ($target === $existing) {
+                throw PlanningException::duplicateTarget($target);
+            }
+
+            if (str_starts_with($target, $existing . '/') || str_starts_with($existing, $target . '/')) {
+                throw PlanningException::targetConflict($existing, $target);
+            }
         }
     }
 }

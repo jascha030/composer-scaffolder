@@ -62,6 +62,26 @@ final class InvalidManifestException extends ScaffolderException
         return new self(sprintf('File operation is missing required field "%s".', $field));
     }
 
+    public static function unexpectedField(string $context, string $field): self
+    {
+        return new self(sprintf('Unexpected field "%s" in %s.', $field, $context));
+    }
+
+    public static function duplicateQuestion(string $key): self
+    {
+        return new self(sprintf('Question key "%s" is defined more than once.', $key));
+    }
+
+    public static function invalidPattern(string $pattern): self
+    {
+        return new self(sprintf('Question validation pattern "%s" is not a valid regular expression.', $pattern));
+    }
+
+    public static function invalidField(string $context, string $field): self
+    {
+        return new self(sprintf('Field "%s" in %s has an invalid value.', $field, $context));
+    }
+
     public static function invalidMode(string $mode): self
     {
         return new self(sprintf('Unsupported file operation mode "%s".', $mode));
