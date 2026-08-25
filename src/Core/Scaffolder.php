@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the jascha030/composer-scaffolder package.
+ *
+ * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core;
@@ -7,8 +16,9 @@ namespace Jascha030\Scaffolder\Core;
 use Jascha030\Scaffolder\Core\Answer\AnswerBag;
 use Jascha030\Scaffolder\Core\Answer\AnswerResolver;
 use Jascha030\Scaffolder\Core\Contract\AnswerProvider;
-use Jascha030\Scaffolder\Core\Contract\GeneratedProjectValidator;
+use Jascha030\Scaffolder\Core\Contract\GeneratedProjectInspector;
 use Jascha030\Scaffolder\Core\Exception\FilesystemException;
+use Jascha030\Scaffolder\Core\Exception\GeneratedProjectValidationException;
 use Jascha030\Scaffolder\Core\Manifest\Manifest;
 use Jascha030\Scaffolder\Core\Operation\FileOperation;
 use Jascha030\Scaffolder\Core\Operation\OperationMode;
@@ -30,7 +40,7 @@ final class Scaffolder
     public function __construct(
         private readonly AnswerProvider $answerProvider,
         private readonly ScaffoldPlanner $planner,
-        private readonly GeneratedProjectValidator $projectValidator,
+        private readonly GeneratedProjectInspector $projectInspector,
         private readonly AnswerResolver $answerResolver = new AnswerResolver(),
     ) {
     }
@@ -46,7 +56,7 @@ final class Scaffolder
         $plan    = $this->planner->plan($manifest, $template->payloadPath, $destination);
         $answers = $this->answerResolver->resolve($manifest, $predefined, $this->answerProvider);
 
-        $this->assertDestinationAvailable($plan->destination, $force);
+        $this->guardDestinationAvailable($plan->destination, $force);
 
         if ($dryRun) {
             return $plan;
@@ -56,7 +66,7 @@ final class Scaffolder
 
         try {
             $this->executePlan($plan, $staging, $answers);
-            $this->projectValidator->validate($staging);
+            $this->guardGeneratedProjectValid($staging);
             $this->finalizeDestination($staging, $plan->destination, $force);
         } catch (Throwable $exception) {
             try {
@@ -71,13 +81,16 @@ final class Scaffolder
         return $plan;
     }
 
-    private function assertDestinationAvailable(string $destination, bool $force): void
+    private function guardDestinationAvailable(string $destination, bool $force): void
     {
-        if (! file_exists($destination) && ! is_link($destination)) {
+        if (! $this->destinationExists($destination)) {
             return;
         }
 
-        if (is_link($destination) || ! is_dir($destination) || ! $this->isDirectoryEmpty($destination)) {
+        if ($this->destinationIsLink($destination)
+            || ! $this->destinationIsDirectory($destination)
+            || ! $this->destinationIsEmpty($destination)
+        ) {
             throw FilesystemException::destinationExists($destination);
         }
 
@@ -86,7 +99,22 @@ final class Scaffolder
         }
     }
 
-    private function isDirectoryEmpty(string $path): bool
+    private function destinationExists(string $destination): bool
+    {
+        return file_exists($destination) || is_link($destination);
+    }
+
+    private function destinationIsLink(string $destination): bool
+    {
+        return is_link($destination);
+    }
+
+    private function destinationIsDirectory(string $destination): bool
+    {
+        return is_dir($destination);
+    }
+
+    private function destinationIsEmpty(string $path): bool
     {
         $entries = @scandir($path);
 
@@ -95,6 +123,21 @@ final class Scaffolder
         }
 
         return [] === array_diff($entries, ['.', '..']);
+    }
+
+    private function guardGeneratedProjectValid(string $staging): void
+    {
+        $composerJsonPath = $staging . '/composer.json';
+
+        if (! $this->projectInspector->hasComposerJson($staging)) {
+            throw GeneratedProjectValidationException::missingComposerJson($composerJsonPath);
+        }
+
+        $error = $this->projectInspector->composerJsonValidationError($staging);
+
+        if (null !== $error) {
+            throw GeneratedProjectValidationException::invalidAt($composerJsonPath, $error);
+        }
     }
 
     private function createStagingDirectory(string $destination): string
@@ -187,7 +230,7 @@ final class Scaffolder
     private function finalizeDestination(string $staging, string $destination, bool $force): void
     {
         if (file_exists($destination) || is_link($destination)) {
-            $this->assertDestinationAvailable($destination, $force);
+            $this->guardDestinationAvailable($destination, $force);
             $this->removeDirectory($destination);
         }
 

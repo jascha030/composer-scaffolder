@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the jascha030/composer-scaffolder package.
+ *
+ * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core\Manifest;
@@ -17,30 +26,50 @@ use function is_bool;
 use function is_int;
 use function is_string;
 
-final class ManifestValidator
+final class ManifestParser
 {
     private const ROOT_FIELDS = ['schema', 'questions', 'files'];
+
     private const QUESTION_FIELDS = ['key', 'type', 'prompt', 'default', 'required', 'validation'];
+
     private const FILE_FIELDS = ['source', 'target', 'mode'];
 
     /**
      * @param array<mixed, mixed> $data
      */
-    public function validate(array $data): Manifest
+    public function parse(array $data): Manifest
     {
-        $this->assertOnlyFields($data, self::ROOT_FIELDS, 'manifest');
+        $this->guardOnlyFields($data, self::ROOT_FIELDS, 'manifest');
 
         $schema = $this->intField($data, 'schema');
 
+        if (! Manifest::supportsSchema($schema)) {
+            throw InvalidManifestException::unsupportedSchema($schema, Manifest::SUPPORTED_SCHEMA);
+        }
+
+        return new Manifest(
+            $schema,
+            $this->parseQuestions($this->arrayField($data, 'questions')),
+            $this->parseFiles($this->arrayField($data, 'files')),
+        );
+    }
+
+    /**
+     * @param array<mixed, mixed> $data
+     *
+     * @return list<TextQuestion>
+     */
+    private function parseQuestions(array $data): array
+    {
         $questions = [];
         $seenKeys  = [];
 
-        foreach ($this->arrayField($data, 'questions') as $question) {
+        foreach ($data as $question) {
             if (! is_array($question)) {
                 throw InvalidManifestException::invalidQuestionsType();
             }
 
-            $this->assertOnlyFields($question, self::QUESTION_FIELDS, 'question');
+            $this->guardOnlyFields($question, self::QUESTION_FIELDS, 'question');
 
             $key = $this->stringField($question, 'key', false);
 
@@ -64,14 +93,24 @@ final class ManifestValidator
             );
         }
 
+        return $questions;
+    }
+
+    /**
+     * @param array<mixed, mixed> $data
+     *
+     * @return list<FileOperation>
+     */
+    private function parseFiles(array $data): array
+    {
         $files = [];
 
-        foreach ($this->arrayField($data, 'files') as $file) {
+        foreach ($data as $file) {
             if (! is_array($file)) {
                 throw InvalidManifestException::invalidFilesType();
             }
 
-            $this->assertOnlyFields($file, self::FILE_FIELDS, 'file operation');
+            $this->guardOnlyFields($file, self::FILE_FIELDS, 'file operation');
 
             $modeString = $this->stringField($file, 'mode', true);
             $mode       = OperationMode::tryFrom($modeString);
@@ -87,7 +126,7 @@ final class ManifestValidator
             );
         }
 
-        return new Manifest($schema, $questions, $files);
+        return $files;
     }
 
     /**
@@ -126,9 +165,7 @@ final class ManifestValidator
     private function stringField(array $data, string $field, bool $isFile): string
     {
         if (! array_key_exists($field, $data) || ! is_string($data[$field])) {
-            throw $isFile
-                ? InvalidManifestException::missingFileField($field)
-                : InvalidManifestException::missingQuestionField($field);
+            throw $isFile ? InvalidManifestException::missingFileField($field) : InvalidManifestException::missingQuestionField($field);
         }
 
         return $data[$field];
@@ -166,7 +203,7 @@ final class ManifestValidator
             throw InvalidManifestException::invalidValidationType();
         }
 
-        $this->assertOnlyFields($validation, ['pattern'], 'question validation');
+        $this->guardOnlyFields($validation, ['pattern'], 'question validation');
 
         $pattern = $validation['pattern'] ?? null;
 
@@ -185,7 +222,7 @@ final class ManifestValidator
      * @param array<mixed, mixed> $data
      * @param list<string>        $allowed
      */
-    private function assertOnlyFields(array $data, array $allowed, string $context): void
+    private function guardOnlyFields(array $data, array $allowed, string $context): void
     {
         foreach (array_keys($data) as $field) {
             if (! is_string($field) || ! in_array($field, $allowed, true)) {

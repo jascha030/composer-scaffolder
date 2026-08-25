@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the jascha030/composer-scaffolder package.
+ *
+ * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core\Manifest;
@@ -16,7 +25,7 @@ use const JSON_ERROR_NONE;
 
 final class ManifestLoader
 {
-    public function __construct(private readonly ManifestValidator $validator = new ManifestValidator())
+    public function __construct(private readonly ManifestParser $parser = new ManifestParser())
     {
     }
 
@@ -38,6 +47,6 @@ final class ManifestLoader
             throw InvalidManifestException::notAnObject($path);
         }
 
-        return $this->validator->validate($data);
+        return $this->parser->parse($data);
     }
 }

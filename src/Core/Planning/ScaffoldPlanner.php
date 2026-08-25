@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the jascha030/composer-scaffolder package.
+ *
+ * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core\Planning;
@@ -9,8 +18,7 @@ use Jascha030\Scaffolder\Core\Manifest\Manifest;
 use Jascha030\Scaffolder\Core\Operation\FileOperation;
 
 use function dirname;
-use function in_array;
-use function str_contains;
+use function realpath;
 
 final class ScaffoldPlanner
 {
@@ -27,14 +35,14 @@ final class ScaffoldPlanner
         $operations      = [];
 
         foreach ($manifest->files as $file) {
-            $this->assertRelativePath($file->source, PlanningException::absoluteSource(...), PlanningException::traversalSource(...));
-            $this->assertRelativePath($file->target, PlanningException::absoluteTarget(...), PlanningException::traversalTarget(...));
+            $this->guardRelativePath($file->source, PlanningException::absoluteSource(...), PlanningException::traversalSource(...));
+            $this->guardRelativePath($file->target, PlanningException::absoluteTarget(...), PlanningException::traversalTarget(...));
 
             $sourcePath = Path::join($payloadRealPath, $file->source);
             $targetPath = Path::join($destinationPath, $file->target);
 
-            $this->assertSourceInsidePayload($sourcePath, $payloadRealPath);
-            $this->assertTargetAvailable($file->target, $targets);
+            $this->guardSourceInsidePayload($sourcePath, $payloadRealPath);
+            $this->guardNoTargetConflict($file->target, $targets);
 
             $operations[] = new FileOperation($sourcePath, $targetPath, $file->mode);
             $targets[]    = $file->target;
@@ -47,7 +55,7 @@ final class ScaffoldPlanner
      * @param callable(string): PlanningException $absoluteException
      * @param callable(string): PlanningException $traversalException
      */
-    private function assertRelativePath(string $path, callable $absoluteException, callable $traversalException): void
+    private function guardRelativePath(string $path, callable $absoluteException, callable $traversalException): void
     {
         if (Path::isAbsolute($path)) {
             throw $absoluteException($path);
@@ -79,7 +87,7 @@ final class ScaffoldPlanner
         return Path::join($parent, basename($destination));
     }
 
-    private function assertSourceInsidePayload(string $sourcePath, string $payloadRealPath): void
+    private function guardSourceInsidePayload(string $sourcePath, string $payloadRealPath): void
     {
         $realSource = realpath($sourcePath);
 
@@ -95,7 +103,7 @@ final class ScaffoldPlanner
     /**
      * @param list<string> $targets
      */
-    private function assertTargetAvailable(string $target, array $targets): void
+    private function guardNoTargetConflict(string $target, array $targets): void
     {
         foreach ($targets as $existing) {
             if ($target === $existing) {

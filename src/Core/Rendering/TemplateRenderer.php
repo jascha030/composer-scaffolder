@@ -16,7 +16,6 @@ namespace Jascha030\Scaffolder\Core\Rendering;
 use Jascha030\Scaffolder\Core\Answer\AnswerBag;
 use Jascha030\Scaffolder\Core\Exception\RenderingException;
 
-use function is_string;
 use function json_encode;
 use function preg_replace_callback;
 use function substr;
@@ -56,13 +55,9 @@ final class TemplateRenderer
 
     private function valueFor(string $key): string
     {
-        if (! $this->answers->has($key) || null === $this->answers->get($key)) {
-            throw RenderingException::missingToken($key);
-        }
-
         $value = $this->answers->get($key);
 
-        if (! is_string($value)) {
+        if (null === $value) {
             throw RenderingException::missingToken($key);
         }
 

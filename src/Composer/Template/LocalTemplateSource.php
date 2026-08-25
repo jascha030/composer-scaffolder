@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the jascha030/composer-scaffolder package.
+ *
+ * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Composer\Template;
@@ -21,7 +30,9 @@ use const JSON_ERROR_NONE;
 final class LocalTemplateSource
 {
     private const EXPECTED_TYPE = 'jascha030-scaffold-template';
+
     private const EXTRA_KEY = 'jascha030-scaffold';
+
     private const METADATA_FIELDS = ['schema', 'manifest', 'payload'];
 
     public function load(string $path): TemplatePackage
@@ -72,13 +83,18 @@ final class LocalTemplateSource
 
     /**
      * @param array<mixed, mixed> $data
+     *
      * @return array{schema: int, manifest: string, payload: string}
      */
     private function metadata(array $data): array
     {
+        if (! isset($data['extra']) || ! is_array($data['extra'])) {
+            throw InvalidTemplateException::missingExtra(self::EXTRA_KEY);
+        }
+
         $metadata = $data['extra'][self::EXTRA_KEY] ?? null;
 
-        if (! isset($data['extra']) || ! is_array($data['extra']) || null === $metadata) {
+        if (null === $metadata) {
             throw InvalidTemplateException::missingExtra(self::EXTRA_KEY);
         }
 

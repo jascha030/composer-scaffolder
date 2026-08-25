@@ -1,11 +1,19 @@
 <?php
 
+/*
+ * This file is part of the jascha030/composer-scaffolder package.
+ *
+ * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Composer\Console;
 
 use Jascha030\Scaffolder\Core\Answer\AnswerBag;
-use Jascha030\Scaffolder\Core\Answer\AnswerValidator;
 use Jascha030\Scaffolder\Core\Contract\AnswerProvider;
 use Jascha030\Scaffolder\Core\Exception\InvalidAnswerException;
 use Jascha030\Scaffolder\Core\Manifest\Manifest;
@@ -17,6 +25,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\Question;
 
 use function is_string;
+use function trim;
 
 final class SymfonyAnswerProvider implements AnswerProvider
 {
@@ -24,7 +33,6 @@ final class SymfonyAnswerProvider implements AnswerProvider
         private readonly InputInterface $input,
         private readonly OutputInterface $output,
         private readonly QuestionHelper $questionHelper,
-        private readonly AnswerValidator $validator = new AnswerValidator(),
     ) {
     }
 
@@ -37,6 +45,10 @@ final class SymfonyAnswerProvider implements AnswerProvider
                 continue;
             }
 
+            if (! $question instanceof TextQuestion) {
+                continue;
+            }
+
             $answers = $answers->with($question->key, $this->ask($question));
         }
 
@@ -46,16 +58,26 @@ final class SymfonyAnswerProvider implements AnswerProvider
     private function ask(TextQuestion $question): ?string
     {
         $symfonyQuestion = new Question($question->prompt, $question->default);
-        $symfonyQuestion->setValidator(function (mixed $value) use ($question): ?string {
+        $symfonyQuestion->setValidator(static function (mixed $value) use ($question): ?string {
             if (null !== $value && ! is_string($value)) {
                 throw new RuntimeException(InvalidAnswerException::invalidType($question->key)->getMessage());
             }
 
-            try {
-                return $this->validator->validate($question, $value);
-            } catch (InvalidAnswerException $exception) {
-                throw new RuntimeException($exception->getMessage(), 0, $exception);
+            $trimmed = null === $value ? null : trim($value);
+
+            if ($question->isMissing($trimmed)) {
+                throw new RuntimeException(InvalidAnswerException::requiredMissing($question->key)->getMessage());
             }
+
+            if (null === $trimmed || '' === $trimmed) {
+                return null;
+            }
+
+            if (! $question->patternMatches($trimmed)) {
+                throw new RuntimeException(InvalidAnswerException::patternMismatch($question->key, $trimmed, $question->pattern ?? '')->getMessage());
+            }
+
+            return $trimmed;
         });
 
         $answer = $this->questionHelper->ask($this->input, $this->output, $symfonyQuestion);

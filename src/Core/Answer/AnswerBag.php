@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the jascha030/composer-scaffolder package.
+ *
+ * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core\Answer;
@@ -27,6 +36,10 @@ final class AnswerBag
 
     public function with(string $key, ?string $value): self
     {
+        if (array_key_exists($key, $this->answers)) {
+            return $this;
+        }
+
         $answers       = $this->answers;
         $answers[$key] = $value;
 

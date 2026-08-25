@@ -1,5 +1,14 @@
 <?php
 
+/*
+ * This file is part of the jascha030/composer-scaffolder package.
+ *
+ * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
+ *
+ * For the full copyright and license information, please view the LICENSE
+ * file that was distributed with this source code.
+ */
+
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Composer\Command;
@@ -7,7 +16,7 @@ namespace Jascha030\Scaffolder\Composer\Command;
 use Composer\Command\BaseCommand;
 use Jascha030\Scaffolder\Composer\Console\SymfonyAnswerProvider;
 use Jascha030\Scaffolder\Composer\Template\LocalTemplateSource;
-use Jascha030\Scaffolder\Composer\Validation\ComposerProjectValidator;
+use Jascha030\Scaffolder\Composer\Validation\ComposerProjectInspector;
 use Jascha030\Scaffolder\Core\Answer\AnswerBag;
 use Jascha030\Scaffolder\Core\Exception\InvalidAnswerException;
 use Jascha030\Scaffolder\Core\Manifest\ManifestLoader;
@@ -50,7 +59,7 @@ final class ScaffoldCommand extends BaseCommand
         $template = (new LocalTemplateSource())->load($templatePath);
         $manifest = (new ManifestLoader())->load($template->manifestPath);
         $provider = new SymfonyAnswerProvider($input, $output, $this->getQuestionHelper());
-        $engine   = new Scaffolder($provider, new ScaffoldPlanner(), new ComposerProjectValidator());
+        $engine   = new Scaffolder($provider, new ScaffoldPlanner(), new ComposerProjectInspector());
         $dryRun   = (bool) $input->getOption('dry-run');
 
         $plan = $engine->scaffold(

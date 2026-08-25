@@ -30,8 +30,13 @@ final class Manifest
         public readonly array $questions,
         public readonly array $files,
     ) {
-        if (self::SUPPORTED_SCHEMA !== $this->schema) {
+        if (! self::supportsSchema($this->schema)) {
             throw InvalidManifestException::unsupportedSchema($this->schema, self::SUPPORTED_SCHEMA);
         }
+    }
+
+    public static function supportsSchema(int $schema): bool
+    {
+        return self::SUPPORTED_SCHEMA === $schema;
     }
 }
