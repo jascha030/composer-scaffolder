@@ -13,6 +13,10 @@ declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core\Operation;
 
+use Jascha030\Scaffolder\Core\Exception\InvalidManifestException;
+
+use function trim;
+
 final class FileOperation
 {
     public function __construct(
@@ -20,5 +24,12 @@ final class FileOperation
         public readonly string $target,
         public readonly OperationMode $mode,
     ) {
+        if ('' === trim($this->source)) {
+            throw InvalidManifestException::invalidField('file operation', 'source');
+        }
+
+        if ('' === trim($this->target)) {
+            throw InvalidManifestException::invalidField('file operation', 'target');
+        }
     }
 }
