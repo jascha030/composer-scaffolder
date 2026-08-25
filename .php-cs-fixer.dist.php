@@ -44,7 +44,7 @@ $finder = Finder::create()
     ->ignoreDotFiles(false);
 
 return new Config(
-    80400,
+    80100,
     <<<'EOF'
         This file is part of the jascha030/composer-scaffolder package.
 
