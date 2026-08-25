@@ -18,6 +18,9 @@ vendor/
 /auth.json
 /.pm.toml
 
+## Playground
+/.playground/
+
 ## Other
 /*.DS_Store
 /.DS_Store
