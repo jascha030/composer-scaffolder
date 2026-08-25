@@ -1,0 +1,11 @@
+{
+    "name": "jascha030/unsupported-schema-template",
+    "type": "jascha030-scaffold-template",
+    "extra": {
+        "jascha030-scaffold": {
+            "schema": 99,
+            "manifest": "scaffold.json",
+            "payload": "template/"
+        }
+    }
+}

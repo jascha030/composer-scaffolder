@@ -1,0 +1,3 @@
+# {{ project.namespace }}
+
+This is the generated project for `{{ package.name }}`.

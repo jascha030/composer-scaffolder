@@ -1,0 +1,11 @@
+{
+    "schema": 1,
+    "questions": [],
+    "files": [
+        {
+            "source": "unsafe.txt",
+            "target": "../unsafe.txt",
+            "mode": "copy"
+        }
+    ]
+}

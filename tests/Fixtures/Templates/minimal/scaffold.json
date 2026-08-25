@@ -1,0 +1,37 @@
+{
+    "schema": 1,
+    "questions": [
+        {
+            "key": "package.name",
+            "type": "text",
+            "prompt": "Composer package name",
+            "required": true,
+            "validation": {
+                "pattern": "^[a-z0-9_.-]+/[a-z0-9_.-]+$"
+            }
+        },
+        {
+            "key": "project.namespace",
+            "type": "text",
+            "prompt": "Root PHP namespace",
+            "default": "App"
+        }
+    ],
+    "files": [
+        {
+            "source": "composer.json.stub",
+            "target": "composer.json",
+            "mode": "render"
+        },
+        {
+            "source": "README.md.stub",
+            "target": "README.md",
+            "mode": "render"
+        },
+        {
+            "source": "src/Application.php.stub",
+            "target": "src/Application.php",
+            "mode": "render"
+        }
+    ]
+}
