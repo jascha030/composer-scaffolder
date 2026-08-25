@@ -13,11 +13,14 @@ declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core\Manifest;
 
+use Jascha030\Scaffolder\Core\Exception\InvalidManifestException;
 use Jascha030\Scaffolder\Core\Operation\FileOperation;
 use Jascha030\Scaffolder\Core\Question\QuestionDefinition;
 
 final class Manifest
 {
+    public const SUPPORTED_SCHEMA = 1;
+
     /**
      * @param list<QuestionDefinition> $questions
      * @param list<FileOperation>      $files
@@ -27,5 +30,8 @@ final class Manifest
         public readonly array $questions,
         public readonly array $files,
     ) {
+        if (self::SUPPORTED_SCHEMA !== $this->schema) {
+            throw InvalidManifestException::unsupportedSchema($this->schema, self::SUPPORTED_SCHEMA);
+        }
     }
 }
