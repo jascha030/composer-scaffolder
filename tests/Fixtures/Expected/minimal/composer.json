@@ -1,0 +1,14 @@
+{
+    "name": "acme/generated-example",
+    "description": "Generated project",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Acme\\GeneratedExample\\": "src/"
+        }
+    },
+    "require": {
+        "php": "^8.1"
+    }
+}

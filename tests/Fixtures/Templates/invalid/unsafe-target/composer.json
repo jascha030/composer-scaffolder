@@ -1,0 +1,11 @@
+{
+    "name": "jascha030/unsafe-target-template",
+    "type": "jascha030-scaffold-template",
+    "extra": {
+        "jascha030-scaffold": {
+            "schema": 1,
+            "manifest": "scaffold.json",
+            "payload": "template/"
+        }
+    }
+}

@@ -1,0 +1,14 @@
+{
+    "name": "{{ package.name }}",
+    "description": "Generated project",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "{{ project.namespace }}\\": "src/"
+        }
+    },
+    "require": {
+        "php": "^8.1"
+    }
+}

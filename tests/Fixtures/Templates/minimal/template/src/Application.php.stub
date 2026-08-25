@@ -1,0 +1,13 @@
+<?php
+
+declare(strict_types=1);
+
+namespace {{ project.namespace }};
+
+final class Application
+{
+    public function name(): string
+    {
+        return '{{ package.name }}';
+    }
+}

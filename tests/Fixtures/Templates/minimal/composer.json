@@ -1,0 +1,13 @@
+{
+    "name": "jascha030/minimal-template",
+    "description": "A minimal scaffold template for tests",
+    "type": "jascha030-scaffold-template",
+    "license": "MIT",
+    "extra": {
+        "jascha030-scaffold": {
+            "schema": 1,
+            "manifest": "scaffold.json",
+            "payload": "template/"
+        }
+    }
+}
