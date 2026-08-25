@@ -1,14 +1,5 @@
 <?php
 
-/*
- * This file is part of the jascha030/composer-scaffolder package.
- *
- * (c) Jascha van Aalst <contact@jaschavanaalst.nl>
- *
- * For the full copyright and license information, please view the LICENSE
- * file that was distributed with this source code.
- */
-
 declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Composer\Command;
@@ -16,6 +7,7 @@ namespace Jascha030\Scaffolder\Composer\Command;
 use Composer\Command\BaseCommand;
 use Jascha030\Scaffolder\Composer\Console\SymfonyAnswerProvider;
 use Jascha030\Scaffolder\Composer\Template\LocalTemplateSource;
+use Jascha030\Scaffolder\Composer\Validation\ComposerProjectValidator;
 use Jascha030\Scaffolder\Core\Answer\AnswerBag;
 use Jascha030\Scaffolder\Core\Exception\InvalidAnswerException;
 use Jascha030\Scaffolder\Core\Manifest\ManifestLoader;
@@ -41,13 +33,12 @@ final class ScaffoldCommand extends BaseCommand
     {
         $this
             ->setName('scaffold')
-            ->setDescription('Generate a Composer project from a scaffold-template package.')
+            ->setDescription('Generate a Composer project from a local scaffold-template package.')
             ->addArgument('template', InputArgument::REQUIRED, 'Path to a local scaffold-template package')
             ->addArgument('directory', InputArgument::REQUIRED, 'Destination directory for the generated project')
             ->addOption('set', null, InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Predefined answer (key=value)')
-            ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Print the operation plan without writing files')
-            ->addOption('force', null, InputOption::VALUE_NONE, 'Allow replacing an existing empty destination')
-            ->addOption('no-install', null, InputOption::VALUE_NONE, 'Skip dependency installation');
+            ->addOption('dry-run', null, InputOption::VALUE_NONE, 'Validate and print the operation plan without writing files')
+            ->addOption('force', null, InputOption::VALUE_NONE, 'Allow replacing an existing empty destination');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -56,37 +47,31 @@ final class ScaffoldCommand extends BaseCommand
         $destination  = $this->stringArgument($input, 'directory');
         $predefined   = $this->parsePredefinedAnswers($this->stringArrayOption($input, 'set'));
 
-        $templateSource = new LocalTemplateSource();
-        $template       = $templateSource->load($templatePath);
-
+        $template = (new LocalTemplateSource())->load($templatePath);
         $manifest = (new ManifestLoader())->load($template->manifestPath);
+        $provider = new SymfonyAnswerProvider($input, $output, $this->getQuestionHelper());
+        $engine   = new Scaffolder($provider, new ScaffoldPlanner(), new ComposerProjectValidator());
+        $dryRun   = (bool) $input->getOption('dry-run');
 
-        $answerProvider = new SymfonyAnswerProvider(
-            $input,
-            $output,
-            $this->getQuestionHelper(),
-        );
-
-        $scaffolder = new Scaffolder($answerProvider, new ScaffoldPlanner());
-        $plan       = $scaffolder->scaffold(
+        $plan = $engine->scaffold(
             $template,
             $manifest,
             $destination,
             $predefined,
-            (bool) $input->getOption('dry-run'),
+            $dryRun,
             (bool) $input->getOption('force'),
         );
 
-        if ((bool) $input->getOption('dry-run')) {
+        if ($dryRun) {
             $this->renderPlan($plan, $output);
+        } else {
+            $output->writeln(sprintf('<info>Generated project in %s</info>', $plan->destination));
         }
 
         return self::SUCCESS;
     }
 
-    /**
-     * @param list<string> $values
-     */
+    /** @param list<string> $values */
     private function parsePredefinedAnswers(array $values): AnswerBag
     {
         $answers = [];
@@ -126,16 +111,14 @@ final class ScaffoldCommand extends BaseCommand
     {
         $value = $input->getArgument($name);
 
-        if (! is_string($value)) {
-            throw new InvalidArgumentException(sprintf('Argument "%s" must be a string.', $name));
+        if (! is_string($value) || '' === $value) {
+            throw new InvalidArgumentException(sprintf('Argument "%s" must be a non-empty string.', $name));
         }
 
         return $value;
     }
 
-    /**
-     * @return list<string>
-     */
+    /** @return list<string> */
     private function stringArrayOption(InputInterface $input, string $name): array
     {
         $value = $input->getOption($name);
@@ -144,17 +127,14 @@ final class ScaffoldCommand extends BaseCommand
             throw new InvalidArgumentException(sprintf('Option "%s" must be an array.', $name));
         }
 
-        $strings = [];
-
         foreach ($value as $item) {
             if (! is_string($item)) {
                 throw new InvalidArgumentException(sprintf('Each value of option "%s" must be a string.', $name));
             }
-
-            $strings[] = $item;
         }
 
-        return $strings;
+        /** @var list<string> $value */
+        return $value;
     }
 
     private function renderPlan(ScaffoldPlan $plan, OutputInterface $output): void
@@ -162,12 +142,7 @@ final class ScaffoldCommand extends BaseCommand
         $output->writeln('<info>Planned operations:</info>');
 
         foreach ($plan->operations as $operation) {
-            $output->writeln(sprintf(
-                '  [%s] %s -> %s',
-                $operation->mode->value,
-                $operation->source,
-                $operation->target,
-            ));
+            $output->writeln(sprintf('  [%s] %s -> %s', $operation->mode->value, $operation->source, $operation->target));
         }
     }
 }

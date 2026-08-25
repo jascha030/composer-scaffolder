@@ -27,9 +27,19 @@ final class InvalidAnswerException extends ScaffolderException
         return new self(sprintf('Answer "%s" with value "%s" does not match pattern "%s".', $key, $value, $pattern));
     }
 
+    public static function invalidType(string $key): self
+    {
+        return new self(sprintf('Answer "%s" must be a string.', $key));
+    }
+
     public static function duplicateKey(string $key): self
     {
         return new self(sprintf('Duplicate answer key "%s" provided.', $key));
+    }
+
+    public static function unknownKey(string $key): self
+    {
+        return new self(sprintf('Unknown answer key "%s".', $key));
     }
 
     public static function malformedSet(string $value): self

@@ -57,6 +57,16 @@ final class PlanningException extends ScaffolderException
         return new self(sprintf('Target path "%s" is defined more than once.', $path));
     }
 
+    public static function targetConflict(string $first, string $second): self
+    {
+        return new self(sprintf('Target paths "%s" and "%s" conflict as file and directory.', $first, $second));
+    }
+
+    public static function invalidDestination(string $path): self
+    {
+        return new self(sprintf('Destination path "%s" is not safe.', $path));
+    }
+
     public static function unsupportedMode(string $mode): self
     {
         return new self(sprintf('Unsupported file operation mode "%s".', $mode));

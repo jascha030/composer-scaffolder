@@ -72,6 +72,11 @@ final class InvalidTemplateException extends ScaffolderException
         return new self(sprintf('Scaffold metadata "%s" resolves to a symlink outside the template package.', $key));
     }
 
+    public static function unexpectedField(string $field): self
+    {
+        return new self(sprintf('Unexpected scaffold metadata field "%s".', $field));
+    }
+
     public static function missingField(string $field): self
     {
         return new self(sprintf('Scaffold metadata is missing required field "%s".', $field));

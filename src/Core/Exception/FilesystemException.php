@@ -13,6 +13,8 @@ declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core\Exception;
 
+use Throwable;
+
 use function sprintf;
 
 final class FilesystemException extends ScaffolderException
@@ -35,6 +37,16 @@ final class FilesystemException extends ScaffolderException
     public static function cannotRemove(string $path): self
     {
         return new self(sprintf('Failed to remove "%s".', $path));
+    }
+
+    public static function cleanupFailed(string $path, Throwable $cleanup, Throwable $original): self
+    {
+        return new self(sprintf(
+            'Generation failed with "%s" and staging cleanup of "%s" also failed: %s',
+            $original->getMessage(),
+            $path,
+            $cleanup->getMessage(),
+        ), 0, $original);
     }
 
     public static function cannotMove(string $source, string $target): self
