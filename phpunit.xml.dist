@@ -2,7 +2,7 @@
 <phpunit
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:noNamespaceSchemaLocation="./tools/phpunit.xsd"
-  bootstrap="./tests/bootstrap.php"
+  bootstrap="./vendor/autoload.php"
   executionOrder="depends,defects"
   beStrictAboutOutputDuringTests="true"
   failOnRisky="true"
@@ -20,8 +20,8 @@
   </testsuites>
   <coverage>
     <report>
-      <clover outputFile=".var/cache/phpunit/cov.xml"/>
-      <text outputFile="php://stdout"/>
+      <clover outputFile=".var/cache/phpunit/cov.xml" />
+      <text outputFile="php://stdout" />
     </report>
   </coverage>
   <source>

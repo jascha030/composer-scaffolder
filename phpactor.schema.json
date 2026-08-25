@@ -268,7 +268,7 @@
         },
         "file_path_resolver.project_root": {
             "description": null,
-            "default": "\/Users\/jaschavanaalst\/.development\/Projects\/Php\/Composer\/jascha030\/project-templates\/composer-template"
+            "default": "\/Users\/jaschavanaalst\/.development\/Projects\/Php\/Composer\/jascha030\/packages\/cli\/composer-scaffolder"
         },
         "file_path_resolver.app_name": {
             "description": null,
