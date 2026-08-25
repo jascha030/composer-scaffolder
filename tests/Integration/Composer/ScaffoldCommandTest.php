@@ -16,6 +16,7 @@ namespace Jascha030\Scaffolder\Tests\Integration\Composer;
 use Composer\Composer;
 use Composer\Console\Application as ComposerApplication;
 use Composer\EventDispatcher\EventDispatcher;
+use Composer\Factory;
 use Composer\IO\NullIO;
 use Composer\Package\RootPackage;
 use Jascha030\Scaffolder\Composer\Command\ScaffoldCommand;
@@ -54,6 +55,7 @@ final class ScaffoldCommandTest extends TestCase
     private function runCommand(array $input): ApplicationTester
     {
         $composer = new Composer();
+        $composer->setConfig(Factory::createConfig(new NullIO(), getcwd() ?: __DIR__));
         $composer->setPackage(new RootPackage('test/test', '1.0.0.0', '1.0.0'));
         $composer->setEventDispatcher(new EventDispatcher($composer, new NullIO()));
 
@@ -81,7 +83,6 @@ final class ScaffoldCommandTest extends TestCase
                 'package.name=acme/generated-example',
                 'project.namespace=Acme\GeneratedExample',
             ],
-            '--no-install'     => true,
             '--no-interaction' => true,
         ]);
 
@@ -113,7 +114,6 @@ final class ScaffoldCommandTest extends TestCase
                 'project.namespace=Acme\GeneratedExample',
             ],
             '--dry-run'        => true,
-            '--no-install'     => true,
             '--no-interaction' => true,
         ]);
 
@@ -128,7 +128,6 @@ final class ScaffoldCommandTest extends TestCase
         $tester = $this->runCommand([
             'template'         => __DIR__ . '/../../Fixtures/Templates/invalid/wrong-type',
             'directory'        => $this->destination,
-            '--no-install'     => true,
             '--no-interaction' => true,
         ]);
 
@@ -141,7 +140,6 @@ final class ScaffoldCommandTest extends TestCase
         $tester = $this->runCommand([
             'template'         => __DIR__ . '/../../Fixtures/Templates/invalid/missing-extra',
             'directory'        => $this->destination,
-            '--no-install'     => true,
             '--no-interaction' => true,
         ]);
 
@@ -154,7 +152,6 @@ final class ScaffoldCommandTest extends TestCase
         $tester = $this->runCommand([
             'template'         => __DIR__ . '/../../Fixtures/Templates/invalid/unsupported-schema',
             'directory'        => $this->destination,
-            '--no-install'     => true,
             '--no-interaction' => true,
         ]);
 
@@ -167,7 +164,6 @@ final class ScaffoldCommandTest extends TestCase
         $tester = $this->runCommand([
             'template'         => __DIR__ . '/../../Fixtures/Templates/invalid/unsafe-target',
             'directory'        => $this->destination,
-            '--no-install'     => true,
             '--no-interaction' => true,
         ]);
 

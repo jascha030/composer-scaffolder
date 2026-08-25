@@ -22,6 +22,11 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
+use function dirname;
+use function is_file;
+use function uniqid;
+use function unlink;
+
 /**
  * @internal
  */
@@ -117,16 +122,22 @@ final class ScaffoldPlannerTest extends TestCase
     #[Test]
     public function itRejectsSymlinksThatEscapePayload(): void
     {
-        $target = $this->payload . '/escape.txt';
+        $target = dirname($this->payload) . '/planner-escape-' . uniqid() . '.txt';
         file_put_contents($target, 'secret');
         symlink($target, $this->payload . '/link.txt');
 
         $manifest = $this->manifest([new FileOperation('link.txt', 'link.txt', OperationMode::Copy)]);
 
         $this->expectException(PlanningException::class);
-        $this->expectExceptionMessage('symlink');
+        $this->expectExceptionMessage('outside the template payload');
 
-        $this->planner->plan($manifest, $this->payload, $this->destination);
+        try {
+            $this->planner->plan($manifest, $this->payload, $this->destination);
+        } finally {
+            if (is_file($target)) {
+                unlink($target);
+            }
+        }
     }
 
     /**

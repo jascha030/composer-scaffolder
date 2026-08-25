@@ -56,8 +56,8 @@ final class AnswerBagTest extends TestCase
     #[Test]
     public function itReturnsAllAnswers(): void
     {
-        $bag = new AnswerBag(['a' => 1, 'b' => 2]);
+        $bag = new AnswerBag(['a' => 'one', 'b' => 'two']);
 
-        self::assertSame(['a' => 1, 'b' => 2], $bag->all());
+        self::assertSame(['a' => 'one', 'b' => 'two'], $bag->all());
     }
 }

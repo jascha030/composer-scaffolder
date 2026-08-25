@@ -15,6 +15,7 @@ namespace Jascha030\Scaffolder\Tests\Unit\Core;
 
 use Jascha030\Scaffolder\Core\Answer\AnswerBag;
 use Jascha030\Scaffolder\Core\Contract\AnswerProvider;
+use Jascha030\Scaffolder\Core\Contract\GeneratedProjectInspector;
 use Jascha030\Scaffolder\Core\Exception\FilesystemException;
 use Jascha030\Scaffolder\Core\Exception\InvalidAnswerException;
 use Jascha030\Scaffolder\Core\Exception\RenderingException;
@@ -30,7 +31,6 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 use function dirname;
-use function is_string;
 
 /**
  * @internal
@@ -48,7 +48,7 @@ final class ScaffolderTest extends TestCase
     {
         $this->payload     = sys_get_temp_dir() . '/scaffolder-payload-' . uniqid();
         $this->destination = sys_get_temp_dir() . '/scaffolder-dest-' . uniqid();
-        $this->scaffolder  = new Scaffolder($this->answerProvider([]), new ScaffoldPlanner());
+        $this->scaffolder  = new Scaffolder($this->answerProvider([]), new ScaffoldPlanner(), $this->projectInspector());
 
         mkdir($this->payload . '/src', 0o700, true);
         file_put_contents($this->payload . '/composer.json.stub', '{"name":"{{ package.name }}"}');
@@ -66,11 +66,13 @@ final class ScaffolderTest extends TestCase
     public function itGeneratesAProjectWithPredefinedAnswers(): void
     {
         $template = new TemplatePackage('', $this->payload);
-        $manifest = new Manifest(1, [], [
+        $manifest = new Manifest(1, [
+            new TextQuestion('package.name', 'Package name', null, true),
+        ], [
             new FileOperation('composer.json.stub', 'composer.json', OperationMode::Render),
         ]);
 
-        $scaffolder = new Scaffolder($this->answerProvider(['package.name' => 'acme/demo']), new ScaffoldPlanner());
+        $scaffolder = new Scaffolder($this->answerProvider(['package.name' => 'acme/demo']), new ScaffoldPlanner(), $this->projectInspector());
         $scaffolder->scaffold($template, $manifest, $this->destination, new AnswerBag(['package.name' => 'acme/demo']));
 
         self::assertFileExists($this->destination . '/composer.json');
@@ -105,7 +107,7 @@ final class ScaffolderTest extends TestCase
         $this->expectException(FilesystemException::class);
         $this->expectExceptionMessage('already exists and is not empty');
 
-        $this->scaffolder->scaffold($template, $manifest, $this->destination, new AnswerBag(['package.name' => 'acme/demo']));
+        $this->scaffolder->scaffold($template, $manifest, $this->destination, new AnswerBag([]));
     }
 
     #[Test]
@@ -115,14 +117,14 @@ final class ScaffolderTest extends TestCase
 
         $template = new TemplatePackage('', $this->payload);
         $manifest = new Manifest(1, [], [
-            new FileOperation('composer.json.stub', 'composer.json', OperationMode::Render),
+            new FileOperation('composer.json.stub', 'composer.json', OperationMode::Copy),
         ]);
 
         $this->scaffolder->scaffold(
             $template,
             $manifest,
             $this->destination,
-            new AnswerBag(['package.name' => 'acme/demo']),
+            new AnswerBag([]),
             false,
             true,
         );
@@ -138,7 +140,7 @@ final class ScaffolderTest extends TestCase
             new FileOperation('composer.json.stub', 'composer.json', OperationMode::Render),
         ]);
 
-        $scaffolder = new Scaffolder($this->answerProvider([]), new ScaffoldPlanner());
+        $scaffolder = new Scaffolder($this->answerProvider([]), new ScaffoldPlanner(), $this->projectInspector());
 
         try {
             $scaffolder->scaffold($template, $manifest, $this->destination, new AnswerBag([]));
@@ -161,7 +163,7 @@ final class ScaffolderTest extends TestCase
             $template,
             $manifest,
             $this->destination,
-            new AnswerBag(['package.name' => 'acme/demo']),
+            new AnswerBag([]),
             true,
         );
 
@@ -201,14 +203,29 @@ final class ScaffolderTest extends TestCase
         $this->scaffolder->scaffold($template, $manifest, $this->destination, new AnswerBag(['package.name' => 'Invalid']));
     }
 
+    private function projectInspector(): GeneratedProjectInspector
+    {
+        return new class implements GeneratedProjectInspector {
+            public function hasComposerJson(string $directory): bool
+            {
+                return true;
+            }
+
+            public function composerJsonValidationError(string $directory): ?string
+            {
+                return null;
+            }
+        };
+    }
+
     /**
-     * @param array<string, mixed> $answers
+     * @param array<string, string|null> $answers
      */
     private function answerProvider(array $answers): AnswerProvider
     {
         return new class ($answers) implements AnswerProvider {
             /**
-             * @param array<string, mixed> $answers
+             * @param array<string, string|null> $answers
              */
             public function __construct(private readonly array $answers)
             {
@@ -226,44 +243,7 @@ final class ScaffolderTest extends TestCase
                     $bag = $bag->with($key, $value);
                 }
 
-                foreach ($manifest->questions as $question) {
-                    if (! $bag->has($question->key) && null !== $question->default) {
-                        $bag = $bag->with($question->key, $question->default);
-                    }
-
-                    if (! $question instanceof TextQuestion) {
-                        continue;
-                    }
-
-                    $value = $bag->get($question->key);
-
-                    if (null === $value || '' === $value) {
-                        if ($question->required) {
-                            throw InvalidAnswerException::requiredMissing($question->key);
-                        }
-
-                        continue;
-                    }
-
-                    if (! is_string($value)) {
-                        throw InvalidAnswerException::patternMismatch($question->key, '', 'value must be a string');
-                    }
-
-                    if (null !== $question->pattern && 1 !== preg_match($this->compilePattern($question->pattern), $value)) {
-                        throw InvalidAnswerException::patternMismatch($question->key, $value, $question->pattern);
-                    }
-                }
-
                 return $bag;
-            }
-
-            private function compilePattern(string $pattern): string
-            {
-                if (1 === preg_match('/^([^a-zA-Z0-9\\\]).*\1$/s', $pattern)) {
-                    return $pattern;
-                }
-
-                return '~' . str_replace('~', '\~', $pattern) . '~';
             }
         };
     }
