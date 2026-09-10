@@ -21,7 +21,6 @@ use Jascha030\Scaffolder\Core\Question\TextQuestion;
 use function array_keys;
 use function array_map;
 use function in_array;
-use function trim;
 
 final class AnswerResolver
 {
@@ -54,10 +53,7 @@ final class AnswerResolver
                 continue;
             }
 
-            $resolved = $resolved->with(
-                $question->key,
-                $this->resolveTextAnswer($question, $value),
-            );
+            $resolved = $resolved->with($question->key, $question->resolveAnswer($value));
         }
 
         return $resolved;
@@ -73,24 +69,5 @@ final class AnswerResolver
                 throw InvalidAnswerException::unknownKey($key);
             }
         }
-    }
-
-    private function resolveTextAnswer(TextQuestion $question, ?string $value): ?string
-    {
-        $trimmed = null === $value ? null : trim($value);
-
-        if ($question->isMissing($trimmed)) {
-            throw InvalidAnswerException::requiredMissing($question->key);
-        }
-
-        if (null === $trimmed || '' === $trimmed) {
-            return null;
-        }
-
-        if (! $question->patternMatches($trimmed)) {
-            throw InvalidAnswerException::patternMismatch($question->key, $trimmed, $question->pattern ?? '');
-        }
-
-        return $trimmed;
     }
 }

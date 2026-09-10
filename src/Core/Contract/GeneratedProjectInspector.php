@@ -15,7 +15,5 @@ namespace Jascha030\Scaffolder\Core\Contract;
 
 interface GeneratedProjectInspector
 {
-    public function hasComposerJson(string $directory): bool;
-
-    public function composerJsonValidationError(string $directory): ?string;
+    public function assertValidProject(string $directory): void;
 }

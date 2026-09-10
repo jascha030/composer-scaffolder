@@ -25,7 +25,6 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Question\Question;
 
 use function is_string;
-use function trim;
 
 final class SymfonyAnswerProvider implements AnswerProvider
 {
@@ -59,25 +58,11 @@ final class SymfonyAnswerProvider implements AnswerProvider
     {
         $symfonyQuestion = new Question($question->prompt, $question->default);
         $symfonyQuestion->setValidator(static function (mixed $value) use ($question): ?string {
-            if (null !== $value && ! is_string($value)) {
-                throw new RuntimeException(InvalidAnswerException::invalidType($question->key)->getMessage());
+            try {
+                return $question->resolveAnswer($value);
+            } catch (InvalidAnswerException $exception) {
+                throw new RuntimeException($exception->getMessage(), 0, $exception);
             }
-
-            $trimmed = null === $value ? null : trim($value);
-
-            if ($question->isMissing($trimmed)) {
-                throw new RuntimeException(InvalidAnswerException::requiredMissing($question->key)->getMessage());
-            }
-
-            if (null === $trimmed || '' === $trimmed) {
-                return null;
-            }
-
-            if (! $question->patternMatches($trimmed)) {
-                throw new RuntimeException(InvalidAnswerException::patternMismatch($question->key, $trimmed, $question->pattern ?? '')->getMessage());
-            }
-
-            return $trimmed;
         });
 
         $answer = $this->questionHelper->ask($this->input, $this->output, $symfonyQuestion);
@@ -86,6 +71,6 @@ final class SymfonyAnswerProvider implements AnswerProvider
             throw InvalidAnswerException::invalidType($question->key);
         }
 
-        return $answer;
+        return $question->resolveAnswer($answer);
     }
 }

@@ -13,8 +13,12 @@ declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Core\Question;
 
+use Jascha030\Scaffolder\Core\Exception\InvalidAnswerException;
 use Jascha030\Scaffolder\Core\Exception\InvalidManifestException;
 use Jascha030\Scaffolder\Core\Validation\RegularExpression;
+
+use function is_string;
+use function trim;
 
 final class TextQuestion extends QuestionDefinition
 {
@@ -63,5 +67,28 @@ final class TextQuestion extends QuestionDefinition
         }
 
         return $this->patternMatches($value);
+    }
+
+    public function resolveAnswer(mixed $value): ?string
+    {
+        if (null !== $value && ! is_string($value)) {
+            throw InvalidAnswerException::invalidType($this->key);
+        }
+
+        $trimmed = null === $value ? null : trim($value);
+
+        if ($this->isMissing($trimmed)) {
+            throw InvalidAnswerException::requiredMissing($this->key);
+        }
+
+        if (null === $trimmed || '' === $trimmed) {
+            return null;
+        }
+
+        if (! $this->patternMatches($trimmed)) {
+            throw InvalidAnswerException::patternMismatch($this->key, $trimmed, $this->pattern ?? '');
+        }
+
+        return $trimmed;
     }
 }

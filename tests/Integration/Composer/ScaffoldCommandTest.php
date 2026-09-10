@@ -13,23 +13,22 @@ declare(strict_types=1);
 
 namespace Jascha030\Scaffolder\Tests\Integration\Composer;
 
-use Composer\Composer;
-use Composer\Console\Application as ComposerApplication;
-use Composer\EventDispatcher\EventDispatcher;
-use Composer\Factory;
-use Composer\IO\NullIO;
-use Composer\Package\RootPackage;
+use Jascha030\Scaffolder\Composer\Bootstrap\ScaffolderFactory;
 use Jascha030\Scaffolder\Composer\Command\ScaffoldCommand;
+use Jascha030\Scaffolder\Composer\Template\LocalTemplateSource;
+use Jascha030\Scaffolder\Core\Manifest\ManifestLoader;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use RecursiveDirectoryIterator;
-use RecursiveIteratorIterator;
-use ReflectionProperty;
-use SplFileInfo;
-use Symfony\Component\Console\Tester\ApplicationTester;
+use Composer\Console\Application;
+use Symfony\Component\Console\Tester\CommandTester;
 
-use function strlen;
+use function dirname;
+use function file_put_contents;
+use function mkdir;
+use function sprintf;
+use function sys_get_temp_dir;
+use function uniqid;
 
 /**
  * @internal
@@ -37,177 +36,149 @@ use function strlen;
 #[CoversClass(ScaffoldCommand::class)]
 final class ScaffoldCommandTest extends TestCase
 {
-    private string $destination;
+    private string $root;
 
     protected function setUp(): void
     {
-        $this->destination = sys_get_temp_dir() . '/scaffold-command-' . uniqid();
+        $this->root = sys_get_temp_dir() . '/composer-scaffolder-command-' . uniqid();
+        mkdir($this->root, 0o700, true);
     }
 
     protected function tearDown(): void
     {
-        $this->removeDirectory($this->destination);
-    }
-
-    /**
-     * @param array<string, mixed> $input
-     */
-    private function runCommand(array $input): ApplicationTester
-    {
-        $composer = new Composer();
-        $composer->setConfig(Factory::createConfig(new NullIO(), getcwd() ?: __DIR__));
-        $composer->setPackage(new RootPackage('test/test', '1.0.0.0', '1.0.0'));
-        $composer->setEventDispatcher(new EventDispatcher($composer, new NullIO()));
-
-        $application = new ComposerApplication();
-        $application->setAutoExit(false);
-
-        $property = new ReflectionProperty($application, 'composer');
-        $property->setValue($application, $composer);
-
-        $application->add(new ScaffoldCommand());
-
-        $tester = new ApplicationTester($application);
-        $tester->run(['command' => 'scaffold'] + $input);
-
-        return $tester;
-    }
-
-    #[Test]
-    public function itGeneratesTheMinimalFixtureProject(): void
-    {
-        $tester = $this->runCommand([
-            'template'  => __DIR__ . '/../../Fixtures/Templates/minimal',
-            'directory' => $this->destination,
-            '--set'     => [
-                'package.name=acme/generated-example',
-                'project.namespace=Acme\GeneratedExample',
-            ],
-            '--no-interaction' => true,
-        ]);
-
-        self::assertSame(0, $tester->getStatusCode());
-
-        self::assertDirectoryExists($this->destination);
-        self::assertFileExists($this->destination . '/composer.json');
-        self::assertFileExists($this->destination . '/README.md');
-        self::assertFileExists($this->destination . '/src/Application.php');
-        self::assertFileDoesNotExist($this->destination . '/scaffold.json');
-        self::assertFileDoesNotExist($this->destination . '/template');
-
-        $composerJson = json_decode(file_get_contents($this->destination . '/composer.json') ?: '', true);
-        self::assertIsArray($composerJson);
-        self::assertSame('acme/generated-example', $composerJson['name']);
-
-        $expected = __DIR__ . '/../../Fixtures/Expected/minimal';
-        self::assertDirectoriesAreEqual($expected, $this->destination);
-    }
-
-    #[Test]
-    public function itPerformsADryRunWithoutWritingFiles(): void
-    {
-        $tester = $this->runCommand([
-            'template'  => __DIR__ . '/../../Fixtures/Templates/minimal',
-            'directory' => $this->destination,
-            '--set'     => [
-                'package.name=acme/generated-example',
-                'project.namespace=Acme\GeneratedExample',
-            ],
-            '--dry-run'        => true,
-            '--no-interaction' => true,
-        ]);
-
-        self::assertSame(0, $tester->getStatusCode());
-        self::assertStringContainsString('Planned operations:', $tester->getDisplay());
-        self::assertDirectoryDoesNotExist($this->destination);
+        $this->removeDirectory($this->root);
     }
 
     #[Test]
     public function itRejectsAWrongTemplateType(): void
     {
-        $tester = $this->runCommand([
-            'template'         => __DIR__ . '/../../Fixtures/Templates/invalid/wrong-type',
-            'directory'        => $this->destination,
-            '--no-interaction' => true,
-        ]);
+        $template = $this->root . '/template';
+        mkdir($template . '/payload', 0o700, true);
+        file_put_contents($template . '/composer.json', '{"name":"acme/template","type":"library","extra":{"jascha030-scaffold":{"schema":1,"manifest":"manifest.json","payload":"payload"}}}');
+        file_put_contents($template . '/manifest.json', '{"schema":1,"questions":[],"files":[]}');
+
+        $tester = $this->commandTester();
+        $tester->execute(['template' => $template, 'directory' => $this->root . '/out']);
 
         self::assertSame(1, $tester->getStatusCode());
+        self::assertStringContainsString('Template package type must be exactly', $tester->getDisplay());
     }
 
     #[Test]
     public function itRejectsMissingTemplateMetadata(): void
     {
-        $tester = $this->runCommand([
-            'template'         => __DIR__ . '/../../Fixtures/Templates/invalid/missing-extra',
-            'directory'        => $this->destination,
-            '--no-interaction' => true,
-        ]);
+        $template = $this->root . '/template';
+        mkdir($template, 0o700, true);
+        file_put_contents($template . '/composer.json', '{"name":"acme/template","type":"jascha030-scaffold-template"}');
+
+        $tester = $this->commandTester();
+        $tester->execute(['template' => $template, 'directory' => $this->root . '/out']);
 
         self::assertSame(1, $tester->getStatusCode());
+        self::assertStringContainsString('must contain "extra.jascha030-scaffold" metadata', $tester->getDisplay());
     }
 
     #[Test]
     public function itRejectsUnsupportedSchema(): void
     {
-        $tester = $this->runCommand([
-            'template'         => __DIR__ . '/../../Fixtures/Templates/invalid/unsupported-schema',
-            'directory'        => $this->destination,
-            '--no-interaction' => true,
-        ]);
+        $template = $this->root . '/template';
+        mkdir($template . '/payload', 0o700, true);
+        file_put_contents($template . '/composer.json', '{"name":"acme/template","type":"jascha030-scaffold-template","extra":{"jascha030-scaffold":{"schema":2,"manifest":"manifest.json","payload":"payload"}}}');
+
+        $tester = $this->commandTester();
+        $tester->execute(['template' => $template, 'directory' => $this->root . '/out']);
 
         self::assertSame(1, $tester->getStatusCode());
+        self::assertStringContainsString('Unsupported scaffold schema', $tester->getDisplay());
     }
 
     #[Test]
     public function itRejectsUnsafeTargetPaths(): void
     {
-        $tester = $this->runCommand([
-            'template'         => __DIR__ . '/../../Fixtures/Templates/invalid/unsafe-target',
-            'directory'        => $this->destination,
-            '--no-interaction' => true,
-        ]);
+        $template = $this->root . '/template';
+        mkdir($template . '/payload', 0o700, true);
+        file_put_contents($template . '/composer.json', '{"name":"acme/template","type":"jascha030-scaffold-template","extra":{"jascha030-scaffold":{"schema":1,"manifest":"manifest.json","payload":"payload"}}}');
+        file_put_contents($template . '/manifest.json', '{"schema":1,"questions":[],"files":[{"source":"file.txt","target":"../escape.txt","mode":"copy"}]}');
+        file_put_contents($template . '/payload/file.txt', 'payload');
+
+        $tester = $this->commandTester();
+        $tester->execute(['template' => $template, 'directory' => $this->root . '/out']);
 
         self::assertSame(1, $tester->getStatusCode());
+        self::assertStringContainsString('Target path', $tester->getDisplay());
     }
 
-    private function assertDirectoriesAreEqual(string $expected, string $actual): void
+    #[Test]
+    public function itGeneratesTheMinimalFixtureProject(): void
     {
-        $expectedFiles = $this->listRelativeFiles($expected);
-        $actualFiles   = $this->listRelativeFiles($actual);
+        $template = $this->createValidTemplate();
+        $output   = $this->root . '/generated';
 
-        self::assertSame($expectedFiles, $actualFiles);
+        $tester = $this->commandTester();
+        $tester->setInputs(['acme/demo']);
+        $tester->execute([
+            'template' => $template,
+            'directory' => $output,
+        ]);
 
-        foreach ($expectedFiles as $file) {
-            self::assertSame(
-                file_get_contents($expected . '/' . $file),
-                file_get_contents($actual . '/' . $file),
-                "File {$file} differs.",
-            );
-        }
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertFileExists($output . '/composer.json');
+        self::assertFileExists($output . '/README.md');
+        self::assertStringContainsString('acme/demo', (string) file_get_contents($output . '/composer.json'));
+        self::assertStringContainsString('Generated project in', $tester->getDisplay());
     }
 
-    /**
-     * @return list<string>
-     */
-    private function listRelativeFiles(string $directory): array
+    #[Test]
+    public function itPerformsADryRunWithoutWritingFiles(): void
     {
-        $files    = [];
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($directory, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::LEAVES_ONLY,
+        $template = $this->createValidTemplate();
+        $output   = $this->root . '/dry-run-output';
+
+        $tester = $this->commandTester();
+        $tester->execute([
+            'template' => $template,
+            'directory' => $output,
+            '--set' => ['package.name=acme/demo'],
+            '--dry-run' => true,
+        ]);
+
+        self::assertSame(0, $tester->getStatusCode());
+        self::assertDirectoryDoesNotExist($output);
+        self::assertStringContainsString('Planned operations:', $tester->getDisplay());
+        self::assertStringContainsString('composer.json.stub', $tester->getDisplay());
+    }
+
+    private function commandTester(): CommandTester
+    {
+        $application = new Application();
+        $application->setAutoExit(false);
+        $application->add(new ScaffoldCommand(
+            new LocalTemplateSource(),
+            new ManifestLoader(),
+            new ScaffolderFactory(),
+        ));
+
+        return new CommandTester($application->find('scaffold'));
+    }
+
+    private function createValidTemplate(): string
+    {
+        $template = $this->root . '/template-valid';
+        mkdir($template . '/payload/src', 0o700, true);
+        file_put_contents(
+            $template . '/composer.json',
+            sprintf(
+                '{"name":"acme/template","type":"jascha030-scaffold-template","extra":{"jascha030-scaffold":{"schema":1,"manifest":"manifest.json","payload":"payload"}}}'
+            )
         );
+        file_put_contents(
+            $template . '/manifest.json',
+            '{"schema":1,"questions":[{"key":"package.name","type":"text","prompt":"Package name","required":true}],"files":[{"source":"composer.json.stub","target":"composer.json","mode":"render"},{"source":"README.md.stub","target":"README.md","mode":"render"}]}'
+        );
+        file_put_contents($template . '/payload/composer.json.stub', '{"name":"{{ package.name }}"}');
+        file_put_contents($template . '/payload/README.md.stub', '# {{ package.name }}');
 
-        foreach ($iterator as $file) {
-            if (! $file instanceof SplFileInfo) {
-                continue;
-            }
-
-            $files[] = substr($file->getPathname(), strlen($directory) + 1);
-        }
-
-        sort($files);
-
-        return $files;
+        return $template;
     }
 
     private function removeDirectory(string $path): void

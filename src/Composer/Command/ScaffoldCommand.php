@@ -14,15 +14,13 @@ declare(strict_types=1);
 namespace Jascha030\Scaffolder\Composer\Command;
 
 use Composer\Command\BaseCommand;
+use Jascha030\Scaffolder\Composer\Bootstrap\ScaffolderFactory;
 use Jascha030\Scaffolder\Composer\Console\SymfonyAnswerProvider;
 use Jascha030\Scaffolder\Composer\Template\LocalTemplateSource;
-use Jascha030\Scaffolder\Composer\Validation\ComposerProjectInspector;
 use Jascha030\Scaffolder\Core\Answer\AnswerBag;
 use Jascha030\Scaffolder\Core\Exception\InvalidAnswerException;
 use Jascha030\Scaffolder\Core\Manifest\ManifestLoader;
 use Jascha030\Scaffolder\Core\Planning\ScaffoldPlan;
-use Jascha030\Scaffolder\Core\Planning\ScaffoldPlanner;
-use Jascha030\Scaffolder\Core\Scaffolder;
 use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Symfony\Component\Console\Helper\QuestionHelper;
 use Symfony\Component\Console\Input\InputArgument;
@@ -34,10 +32,19 @@ use function array_key_exists;
 use function is_array;
 use function is_string;
 use function sprintf;
+use function strpos;
 use function substr;
 
 final class ScaffoldCommand extends BaseCommand
 {
+    public function __construct(
+        private readonly LocalTemplateSource $templateSource,
+        private readonly ManifestLoader $manifestLoader,
+        private readonly ScaffolderFactory $scaffolderFactory,
+    ) {
+        parent::__construct();
+    }
+
     protected function configure(): void
     {
         $this
@@ -56,10 +63,10 @@ final class ScaffoldCommand extends BaseCommand
         $destination  = $this->stringArgument($input, 'directory');
         $predefined   = $this->parsePredefinedAnswers($this->stringArrayOption($input, 'set'));
 
-        $template = (new LocalTemplateSource())->load($templatePath);
-        $manifest = (new ManifestLoader())->load($template->manifestPath);
+        $template = $this->templateSource->load($templatePath);
+        $manifest = $this->manifestLoader->load($template->manifestPath);
         $provider = new SymfonyAnswerProvider($input, $output, $this->getQuestionHelper());
-        $engine   = new Scaffolder($provider, new ScaffoldPlanner(), new ComposerProjectInspector());
+        $engine   = $this->scaffolderFactory->create($provider);
         $dryRun   = (bool) $input->getOption('dry-run');
 
         $plan = $engine->scaffold(

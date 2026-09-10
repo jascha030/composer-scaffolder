@@ -16,27 +16,25 @@ namespace Jascha030\Scaffolder\Composer\Validation;
 use Composer\Json\JsonFile;
 use Composer\Json\JsonValidationException;
 use Jascha030\Scaffolder\Core\Contract\GeneratedProjectInspector;
+use Jascha030\Scaffolder\Core\Exception\GeneratedProjectValidationException;
 use Throwable;
 
 final class ComposerProjectInspector implements GeneratedProjectInspector
 {
-    public function hasComposerJson(string $directory): bool
-    {
-        return is_file($directory . '/composer.json');
-    }
-
-    public function composerJsonValidationError(string $directory): ?string
+    public function assertValidProject(string $directory): void
     {
         $path = $directory . '/composer.json';
+
+        if (! is_file($path)) {
+            throw GeneratedProjectValidationException::missingComposerJson($path);
+        }
 
         try {
             (new JsonFile($path))->validateSchema(JsonFile::LAX_SCHEMA);
         } catch (JsonValidationException $exception) {
-            return implode('; ', $exception->getErrors());
+            throw GeneratedProjectValidationException::invalidAt($path, implode('; ', $exception->getErrors()));
         } catch (Throwable $exception) {
-            return $exception->getMessage();
+            throw GeneratedProjectValidationException::invalidAt($path, $exception->getMessage());
         }
-
-        return null;
     }
 }

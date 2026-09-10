@@ -14,11 +14,14 @@ declare(strict_types=1);
 namespace Jascha030\Scaffolder\Tests\Unit\Core;
 
 use Jascha030\Scaffolder\Core\Answer\AnswerBag;
+use Jascha030\Scaffolder\Core\Answer\AnswerResolver;
 use Jascha030\Scaffolder\Core\Contract\AnswerProvider;
 use Jascha030\Scaffolder\Core\Contract\GeneratedProjectInspector;
+use Jascha030\Scaffolder\Core\Execution\PlanExecutor;
 use Jascha030\Scaffolder\Core\Exception\FilesystemException;
 use Jascha030\Scaffolder\Core\Exception\InvalidAnswerException;
 use Jascha030\Scaffolder\Core\Exception\RenderingException;
+use Jascha030\Scaffolder\Core\Filesystem\NativeProjectFilesystem;
 use Jascha030\Scaffolder\Core\Manifest\Manifest;
 use Jascha030\Scaffolder\Core\Operation\FileOperation;
 use Jascha030\Scaffolder\Core\Operation\OperationMode;
@@ -48,7 +51,7 @@ final class ScaffolderTest extends TestCase
     {
         $this->payload     = sys_get_temp_dir() . '/scaffolder-payload-' . uniqid();
         $this->destination = sys_get_temp_dir() . '/scaffolder-dest-' . uniqid();
-        $this->scaffolder  = new Scaffolder($this->answerProvider([]), new ScaffoldPlanner(), $this->projectInspector());
+        $this->scaffolder  = $this->makeScaffolder($this->answerProvider([]));
 
         mkdir($this->payload . '/src', 0o700, true);
         file_put_contents($this->payload . '/composer.json.stub', '{"name":"{{ package.name }}"}');
@@ -72,7 +75,7 @@ final class ScaffolderTest extends TestCase
             new FileOperation('composer.json.stub', 'composer.json', OperationMode::Render),
         ]);
 
-        $scaffolder = new Scaffolder($this->answerProvider(['package.name' => 'acme/demo']), new ScaffoldPlanner(), $this->projectInspector());
+        $scaffolder = $this->makeScaffolder($this->answerProvider(['package.name' => 'acme/demo']));
         $scaffolder->scaffold($template, $manifest, $this->destination, new AnswerBag(['package.name' => 'acme/demo']));
 
         self::assertFileExists($this->destination . '/composer.json');
@@ -140,7 +143,7 @@ final class ScaffolderTest extends TestCase
             new FileOperation('composer.json.stub', 'composer.json', OperationMode::Render),
         ]);
 
-        $scaffolder = new Scaffolder($this->answerProvider([]), new ScaffoldPlanner(), $this->projectInspector());
+        $scaffolder = $this->makeScaffolder($this->answerProvider([]));
 
         try {
             $scaffolder->scaffold($template, $manifest, $this->destination, new AnswerBag([]));
@@ -203,17 +206,25 @@ final class ScaffolderTest extends TestCase
         $this->scaffolder->scaffold($template, $manifest, $this->destination, new AnswerBag(['package.name' => 'Invalid']));
     }
 
+    private function makeScaffolder(AnswerProvider $answerProvider): Scaffolder
+    {
+        $filesystem = new NativeProjectFilesystem();
+
+        return new Scaffolder(
+            $answerProvider,
+            new ScaffoldPlanner(),
+            $this->projectInspector(),
+            new AnswerResolver(),
+            $filesystem,
+            new PlanExecutor($filesystem),
+        );
+    }
+
     private function projectInspector(): GeneratedProjectInspector
     {
         return new class implements GeneratedProjectInspector {
-            public function hasComposerJson(string $directory): bool
+            public function assertValidProject(string $directory): void
             {
-                return true;
-            }
-
-            public function composerJsonValidationError(string $directory): ?string
-            {
-                return null;
             }
         };
     }
